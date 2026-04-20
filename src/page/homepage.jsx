@@ -4,7 +4,7 @@ import ProductCatalog from '../components/ProductCatalog';
 import ShoppingCart from '../components/ShoppingCart';
 import OrderSummary from '../components/OrderSummary';
 import { ShoppingCartIcon, UserIcon } from '@heroicons/react/24/outline';
-import { Flex, Text, Button ,  DropdownMenu,} from "@radix-ui/themes";
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 // import {
 
 // } from "../components/ui/dropdown-menu"
@@ -131,27 +131,21 @@ const App = () => {
               {user && (
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <UserIcon className="h-5 w-5" />
-                  <Flex gap="3" align="center">
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger>
-                        <Button variant="solid">
-                          Options
-                          {/* <DropdownMenu.TriggerIcon /> */}
-                        </Button>
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Content variant="solid">
-                        <DropdownMenu.Item shortcut="⌘ E">Edit</DropdownMenu.Item>
-                        <DropdownMenu.Item shortcut="⌘ D">Duplicate</DropdownMenu.Item>
-                        <DropdownMenu.Separator />
-                        <DropdownMenu.Item shortcut="⌘ N">Archive</DropdownMenu.Item>
-
-                        <DropdownMenu.Separator />
-                        <DropdownMenu.Item shortcut="⌘ ⌫" color="red">
-                          Delete
-                        </DropdownMenu.Item>
-                      </DropdownMenu.Content>
-                    </DropdownMenu.Root>
-                  </Flex>
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium">
+                        Options
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content className="min-w-[180px] bg-white rounded-md p-2 shadow-lg border border-gray-200 z-50" sideOffset={5}>
+                      <DropdownMenu.Item className="flex items-center px-2 py-1 text-sm text-gray-900 rounded hover:bg-gray-100 cursor-pointer outline-none">Edit</DropdownMenu.Item>
+                      <DropdownMenu.Item className="flex items-center px-2 py-1 text-sm text-gray-900 rounded hover:bg-gray-100 cursor-pointer outline-none">Duplicate</DropdownMenu.Item>
+                      <DropdownMenu.Separator className="h-px bg-gray-200 my-1" />
+                      <DropdownMenu.Item className="flex items-center px-2 py-1 text-sm text-gray-900 rounded hover:bg-gray-100 cursor-pointer outline-none">Archive</DropdownMenu.Item>
+                      <DropdownMenu.Separator className="h-px bg-gray-200 my-1" />
+                      <DropdownMenu.Item className="flex items-center px-2 py-1 text-sm text-red-600 rounded hover:bg-red-50 cursor-pointer outline-none">Delete</DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Root>
 
                 </div>
               )}

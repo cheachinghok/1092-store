@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ProductCard = ({ product, onAddToCart }) => {
+const ProductCard = ({ product, onAddToCart }: { product: any; onAddToCart: (product: any, quantity: number) => void }) => {
   const [quantity, setQuantity] = useState(1);
 
   const handleAddToCart = () => {
@@ -10,7 +10,7 @@ const ProductCard = ({ product, onAddToCart }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-      <div className="aspect-w-1 aspect-h-1 w-full overflow-hidden">
+      <div className="aspect-square w-full overflow-hidden">
         <img
           src={product.image}
           alt={product.name}

@@ -157,7 +157,7 @@ const AuthForm = () => {
           {/* Decorative Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-center">
             <div className="flex items-center justify-center mb-4">
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                 <LockClosedIcon className="h-6 w-6 text-white" />
               </div>
             </div>
@@ -340,7 +340,7 @@ const AuthForm = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 transform hover:-translate-y-0.5"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 hover:-translate-y-0.5"
               >
                 {isLoading ? 'Loading...' : isLogin ? 'Sign In' : 'Create Account'}
               </button>

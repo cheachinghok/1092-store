@@ -197,7 +197,7 @@ const App = () => {
       {isCartOpen && (
         <div className="fixed inset-0 z-60 overflow-hidden">
           <div 
-            className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+            className="absolute inset-0 bg-black/50 transition-opacity"
             onClick={() => setIsCartOpen(false)}
           />
           

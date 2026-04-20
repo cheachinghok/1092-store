@@ -1,4 +1,5 @@
-import React, { useState ,} from 'react';
+import React, { useState } from 'react';
+import { API_BASE } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { 
   EyeIcon,
@@ -122,7 +123,7 @@ const AuthForm = () => {
   }
 
   const login = async (credentials: Credentials): Promise<boolean> => {
-    const url = isLogin ? '/api/auth/login' : '/api/auth/register';
+    const url = isLogin ? `${API_BASE}/api/auth/login` : `${API_BASE}/api/auth/register`;
     const body: LoginRequestBody | RegisterRequestBody = isLogin
       ? { email: credentials.email, password: credentials.password }
       : { name: credentials.username || '', email: credentials.email, password: credentials.password };

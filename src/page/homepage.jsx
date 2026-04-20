@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../lib/utils';
 import ProductCatalog from '../components/ProductCatalog';
 import ShoppingCart from '../components/ShoppingCart';
 import OrderSummary from '../components/OrderSummary';
@@ -25,7 +26,7 @@ const App = () => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    fetch('/api/auth/me', {
+    fetch(`${API_BASE}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -81,7 +82,7 @@ const App = () => {
 
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('/api/orders', {
+      const response = await fetch(`${API_BASE}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

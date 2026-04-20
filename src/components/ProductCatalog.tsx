@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ProductCard from './ProductCard';
+import { API_BASE } from '../lib/utils';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
@@ -30,7 +31,7 @@ const ProductCatalog = ({ onAddToCart, onViewCart }: ProductCatalogProps) => {
     if (selectedCategory) params.set('category', selectedCategory);
 
     try {
-      const res = await fetch(`/api/products?${params}`);
+      const res = await fetch(`${API_BASE}/api/products?${params}`);
       const data = await res.json();
       if (data.success) {
         setProducts(

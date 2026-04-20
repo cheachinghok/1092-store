@@ -23,7 +23,7 @@ const AuthForm = () => {
   const navigate = useNavigate();
   const [errors, setErrors] = useState<Record<string, string>>({} as Record<string, string>);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e:any) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -66,7 +66,7 @@ const AuthForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e:any) => {
     e.preventDefault();
     
     if (validateForm()) {
@@ -99,11 +99,33 @@ const AuthForm = () => {
       rememberMe: false
     });
   };
-  const login = async (credentials) => {
+  interface Credentials {
+    username?: string;
+    email: string;
+    password: string;
+  }
+
+  interface LoginRequestBody {
+    email: string;
+    password: string;
+  }
+
+  interface RegisterRequestBody {
+    name: string;
+    email: string;
+    password: string;
+  }
+
+  interface AuthResponse {
+    token?: string;
+    message?: string;
+  }
+
+  const login = async (credentials: Credentials): Promise<boolean> => {
     const url = isLogin ? '/api/auth/login' : '/api/auth/register';
-    const body = isLogin
+    const body: LoginRequestBody | RegisterRequestBody = isLogin
       ? { email: credentials.email, password: credentials.password }
-      : { name: credentials.username, email: credentials.email, password: credentials.password };
+      : { name: credentials.username || '', email: credentials.email, password: credentials.password };
 
     try {
       const response = await fetch(url, {
@@ -111,7 +133,7 @@ const AuthForm = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await response.json();
+      const data: AuthResponse = await response.json();
       setIsLoading(false);
       if (response.ok && data.token) {
         localStorage.setItem('token', data.token);

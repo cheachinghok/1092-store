@@ -14,12 +14,12 @@ const App = () => {
   const [currentView, setCurrentView] = useState('catalog');
   const [user, setUser] = useState(null);
   const [shippingAddress, setShippingAddress] = useState({
-    fullName: '',
-    address: '',
-    city: '',
-    postalCode: '',
-    country: '',
-    phone: ''
+    fullName: 'chea chinghok',
+    address: '1092 store',
+    city: 'phnom penh',
+    postalCode: '12000',
+    country: 'cambodia',
+    phone: '085880362'
   });
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
 

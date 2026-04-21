@@ -27,24 +27,26 @@ export default function Products() {
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    const timer = setTimeout(fetchProducts, 1000);
+    return () => clearTimeout(timer);
+  }, [search, filter]);
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE}/api/products`, { headers: { Authorization: `Bearer ${token}` } });
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (filter) params.set('category', filter);
+      params.set('limit', '100');
+      params.set('sortBy', 'name');
+      params.set('sortOrder', 'asc');
+      const res = await fetch(`${API_BASE}/api/products/search?${params}`);
       const d = await res.json();
       if (d.success) setProducts(d.data);
     } catch {} finally { setLoading(false); }
   };
 
-  const filtered = products.filter(p => {
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = !filter || p.category === filter;
-    return matchSearch && matchCat;
-  });
+  const filtered = products;
 
   const openAdd = () => { setEditTarget(null); setForm(emptyForm); setSlideOpen(true); };
   const openEdit = (p: Product) => {

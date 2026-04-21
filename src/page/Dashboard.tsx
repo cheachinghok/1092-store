@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../lib/utils';
 
+interface ReportDay {
+  date: string;
+  revenue: number;
+  profit: number;
+  orders: number;
+}
+
 interface Product {
   _id: string;
   name: string;
@@ -9,26 +16,52 @@ interface Product {
   category: string;
 }
 
+interface TodaySummary {
+  totalRevenue: number;
+  totalProfit: number;
+  totalOrders: number;
+}
+
 export default function Dashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [todaySummary, setTodaySummary] = useState<TodaySummary | null>(null);
+  const [chartData, setChartData] = useState<ReportDay[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
+    const today = new Date().toISOString().split('T')[0];
+
     fetch(`${API_BASE}/api/products`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(d => { if (d.success) setProducts(d.data); })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    fetch(`${API_BASE}/api/orders/report?period=daily&startDate=${today}&endDate=${today}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (d.success) setTodaySummary(d.summary); })
+      .catch(() => {});
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+    fetch(`${API_BASE}/api/orders/report?period=daily&startDate=${sevenDaysAgo}&endDate=${today}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (d.success) setChartData(d.data); })
+      .catch(() => {});
   }, []);
 
   const lowStock = products.filter(p => p.stock <= 10);
+  const fmt = (n: number) => `$${n.toFixed(2)}`;
 
   const statCards = [
-    { label: "Today's Revenue", value: '$ —', sub: 'UI Only', color: 'text-indigo-600' },
-    { label: 'Transactions', value: '—', sub: 'UI Only', color: 'text-blue-600' },
-    { label: 'Items Sold', value: '—', sub: 'UI Only', color: 'text-purple-600' },
+    { label: "Today's Revenue", value: todaySummary ? fmt(todaySummary.totalRevenue) : '…', sub: 'Live', color: 'text-indigo-600' },
+    { label: "Today's Profit", value: todaySummary ? fmt(todaySummary.totalProfit) : '…', sub: 'Live', color: 'text-emerald-600' },
+    { label: "Today's Orders", value: todaySummary ? String(todaySummary.totalOrders) : '…', sub: 'Live', color: 'text-blue-600' },
     { label: 'Low Stock Items', value: loading ? '…' : String(lowStock.length), sub: 'Live', color: lowStock.length > 0 ? 'text-red-600' : 'text-emerald-600' },
   ];
 
@@ -112,20 +145,34 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Sales chart placeholder */}
+      {/* Sales chart — last 7 days */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-800">Today's Sales</h2>
-          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">UI Only — connect to /api/reports/daily</span>
-        </div>
-        <div className="flex items-end gap-2 h-32">
-          {[40, 65, 30, 80, 55, 90, 45, 70, 35, 60, 85, 50].map((h, i) => (
-            <div key={i} className="flex-1 bg-indigo-100 rounded-t" style={{ height: `${h}%` }} />
-          ))}
-        </div>
-        <div className="flex justify-between text-xs text-gray-400 mt-2">
-          <span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>Now</span>
-        </div>
+        <h2 className="font-semibold text-gray-800 mb-4">Revenue — Last 7 Days</h2>
+        {chartData.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-gray-400 text-sm">No orders in the last 7 days</div>
+        ) : (
+          <>
+            <div className="flex items-end gap-2 h-32">
+              {chartData.map((d, i) => {
+                const maxRev = Math.max(...chartData.map(x => x.revenue), 1);
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <div
+                      className="w-full bg-indigo-400 hover:bg-indigo-600 rounded-t transition-colors cursor-default"
+                      style={{ height: `${Math.max((d.revenue / maxRev) * 100, 4)}%` }}
+                      title={`${d.date}: $${d.revenue.toFixed(2)} revenue`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between text-xs text-gray-400 mt-2">
+              {chartData.map((d, i) => (
+                <span key={i}>{new Date(d.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

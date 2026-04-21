@@ -1,176 +1,71 @@
-# API Documentation — modern-node-app
+# API Documentation
 
-> **Purpose:** This document is intended to help AI models (or developers) integrate with this API. It covers every available endpoint, authentication, request/response shapes, and error handling.
+Base URL: `http://localhost:5000` (development) / `https://your-production-domain.com` (production)
 
----
-
-## Base URL
-
+All protected routes require:
 ```
-http://localhost:5000
+Authorization: Bearer <token>
 ```
-
-> In production, replace with your deployed domain.
 
 ---
 
 ## Authentication
 
-This API uses **JWT Bearer tokens**.
-
-1. Register or log in to receive a `token`.
-2. Include the token in every protected request:
-
+### Register
 ```
-Authorization: Bearer <token>
+POST /api/auth/register
 ```
-
-Tokens expire after **30 days** (configurable via `JWT_EXPIRE` in `.env`).
-
-### Access Levels
-
-| Level | Description |
-|-------|-------------|
-| `Public` | No authentication required |
-| `Private` | Must send a valid JWT token |
-| `Admin` | Must send a valid JWT token with `role: "admin"` |
-
----
-
-## Error Response Format
-
-All errors follow this shape:
-
-```json
-{
-  "success": false,
-  "message": "Human-readable error description"
-}
-```
-
-Validation errors return an `errors` array:
-
-```json
-{
-  "success": false,
-  "errors": [
-    { "msg": "Email is required", "path": "email" }
-  ]
-}
-```
-
-### Common HTTP Status Codes
-
-| Code | Meaning |
-|------|---------|
-| `200` | OK |
-| `201` | Created |
-| `400` | Bad Request / Validation Error |
-| `401` | Unauthorized (missing/invalid token) |
-| `403` | Forbidden (insufficient role) |
-| `404` | Resource Not Found |
-| `429` | Too Many Requests (rate limited: 100 req/15min) |
-| `500` | Internal Server Error |
-
----
-
-## Health & Root
-
-### `GET /health`
-
-Check if the server and database are running.
-
-**Access:** Public
-
-**Response:**
-```json
-{
-  "status": "OK",
-  "timestamp": "2026-04-18T10:00:00.000Z",
-  "service": "modern-node-app",
-  "database": "connected"
-}
-```
-
----
-
-### `GET /`
-
-Root endpoint, confirms the API is online.
-
-**Access:** Public
-
-**Response:**
-```json
-{
-  "message": "Modern Node App API is running!",
-  "timestamp": "2026-04-18T10:00:00.000Z",
-  "environment": "development"
-}
-```
-
----
-
-## Authentication — `/api/auth`
-
-### `POST /api/auth/register`
-
-Register a new user account.
-
-**Access:** Public
-
-**Request Body:**
+**Body (JSON)**
 ```json
 {
   "name": "John Doe",
   "email": "john@example.com",
-  "password": "secret123"
+  "password": "password123"
 }
 ```
-
-| Field | Type | Required | Rules |
-|-------|------|----------|-------|
-| `name` | string | Yes | 2–50 characters |
-| `email` | string | Yes | Valid email format |
-| `password` | string | Yes | Min 6 characters |
-
-**Response `201`:**
+**Response 201**
 ```json
 {
   "success": true,
-  "token": "<jwt-token>",
-  "user": {
-    "id": "64abc123...",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
-  }
+  "token": "eyJhbGciOiJIUzI1NiIs..."
 }
 ```
 
 ---
 
-### `POST /api/auth/login`
-
-Log in with email and password.
-
-**Access:** Public
-
-**Request Body:**
+### Login
+```
+POST /api/auth/login
+```
+**Body (JSON)**
 ```json
 {
   "email": "john@example.com",
-  "password": "secret123"
+  "password": "password123"
 }
 ```
-
-**Response `200`:**
+**Response 200**
 ```json
 {
   "success": true,
-  "token": "<jwt-token>",
-  "user": {
-    "id": "64abc123...",
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+---
+
+### Get Current User
+```
+GET /api/auth/me
+```
+**Protected**: Yes
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "64f...",
     "name": "John Doe",
     "email": "john@example.com",
     "role": "user"
@@ -180,169 +75,312 @@ Log in with email and password.
 
 ---
 
-### `GET /api/auth/me`
+## Image Upload *(NEW)*
 
-Get the currently authenticated user's profile.
+> Upload images to Google Drive before creating or updating a product. You will receive a public URL to use in the product form.
 
-**Access:** Private
+### Upload Images
+```
+POST /api/upload/image
+```
+**Protected**: Yes
 
-**Headers:** `Authorization: Bearer <token>`
+**Content-Type**: `multipart/form-data`
 
-**Response `200`:**
+**Form field name**: `images` (must be exactly this name)
+
+**Limits**:
+- Max **5 images** per request
+- Max **5MB** per image
+- Allowed types: `JPEG`, `JPG`, `PNG`, `WebP`
+
+**Request example (fetch)**
+```js
+const formData = new FormData();
+formData.append('images', file); // file from <input type="file">
+
+const response = await fetch('/api/upload/image', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${token}`,
+    // Do NOT set Content-Type manually — browser sets it with the boundary
+  },
+  body: formData,
+});
+const data = await response.json();
+// data.data.urls[0] → Google Drive public URL
+```
+
+**Request example (mobile — React Native)**
+```js
+const formData = new FormData();
+formData.append('images', {
+  uri: photo.uri,          // from camera or gallery picker
+  name: 'photo.jpg',
+  type: 'image/jpeg',
+});
+
+const response = await fetch('/api/upload/image', {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}` },
+  body: formData,
+});
+```
+
+**Response 200**
 ```json
 {
   "success": true,
-  "user": {
-    "id": "64abc123...",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
+  "count": 2,
+  "data": {
+    "urls": [
+      "https://drive.google.com/uc?export=view&id=1AbC...",
+      "https://drive.google.com/uc?export=view&id=2DeF..."
+    ]
   }
 }
 ```
 
+**Error Responses**
+
+| Status | Message | Cause |
+|--------|---------|-------|
+| 400 | No files uploaded. Please attach at least one image. | No file attached |
+| 400 | File too large. Maximum size is 5MB per image. | File exceeds 5MB |
+| 400 | Unexpected field name. Use "images" as the field name. | Wrong form field name |
+| 400 | Invalid file type. Only JPEG, PNG, and WebP images are allowed. | Non-image file |
+| 401 | Not authorized | Missing or invalid token |
+
 ---
 
-## Products — `/api/products`
+## Products
 
-### `GET /api/products`
+### Get All Products
+```
+GET /api/products
+```
+**Protected**: No
 
-Get all products with pagination, search, and filtering.
-
-**Access:** Public
-
-**Query Parameters:**
+**Query Parameters**
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `page` | number | Page number (default: `1`) |
-| `limit` | number | Results per page (default: `10`) |
+| `page` | number | Page number (default: 1) |
+| `limit` | number | Items per page (default: 10) |
 | `search` | string | Full-text search on name and description |
-| `category` | string | Filter by category: `Electronics`, `Clothing`, `Books`, `Home`, `Sports`, `Other` |
-| `minPrice` | number | Minimum selling price filter |
-| `maxPrice` | number | Maximum selling price filter |
+| `category` | string | Filter by category (`Electronics`, `Clothing`, `Books`, `Home`, `Sports`, `Other`) |
+| `minPrice` | number | Minimum selling price |
+| `maxPrice` | number | Maximum selling price |
 
-**Response `200`:**
+**Response 200**
 ```json
 {
   "success": true,
-  "count": 5,
+  "count": 10,
   "total": 42,
   "pagination": {
     "page": 1,
-    "pages": 9,
-    "limit": 5
+    "pages": 5,
+    "limit": 10
   },
-  "data": [
-    {
-      "_id": "64abc123...",
-      "name": "Wireless Headphones",
-      "description": "Premium audio experience",
-      "buyingPrice": 50,
-      "sellingPrice": 99.99,
-      "stock": 25,
-      "category": "Electronics",
-      "images": [],
-      "rating": 4.5,
-      "featured": false,
-      "isActive": true,
-      "createdBy": { "name": "Admin", "email": "admin@example.com" },
-      "profitMargin": 49.99,
-      "profitMarginPercentage": "99.98"
-    }
-  ]
+  "data": [ ...products ]
 }
 ```
 
 ---
 
-### `GET /api/products/:id`
+### Search Products *(NEW)*
+```
+GET /api/products/search
+```
+**Protected**: No
 
-Get a single product by ID.
+**Query Parameters**
 
-**Access:** Public
+| Param | Type | Description |
+|-------|------|-------------|
+| `search` | string | Partial, case-insensitive match on name or description |
+| `category` | string | `Electronics`, `Clothing`, `Books`, `Home`, `Sports`, `Other` |
+| `minPrice` | number | Minimum selling price |
+| `maxPrice` | number | Maximum selling price |
+| `inStock` | boolean | `true` = only show products with stock > 0 |
+| `sortBy` | string | `name`, `sellingPrice`, `rating`, `createdAt` (default: `createdAt`) |
+| `sortOrder` | string | `asc` or `desc` (default: `desc`) |
+| `page` | number | Page number (default: 1) |
+| `limit` | number | Items per page (default: 10) |
 
-**Response `200`:**
+**Examples**
+```
+GET /api/products/search?search=phone&inStock=true&sortBy=sellingPrice&sortOrder=asc
+GET /api/products/search?category=Electronics&minPrice=10&maxPrice=200&page=1&limit=5
+GET /api/products/search?search=headphone&sortBy=rating&sortOrder=desc
+```
+
+**Response 200**
 ```json
 {
   "success": true,
-  "data": { ... }
+  "count": 3,
+  "total": 3,
+  "pagination": {
+    "page": 1,
+    "pages": 1,
+    "limit": 10
+  },
+  "data": [ ...products ]
+}
+```
+
+**React fetch example**
+```js
+const searchProducts = async ({ search, category, inStock, sortBy, sortOrder, page }) => {
+  const params = new URLSearchParams();
+  if (search)    params.append('search', search);
+  if (category)  params.append('category', category);
+  if (inStock)   params.append('inStock', 'true');
+  if (sortBy)    params.append('sortBy', sortBy);
+  if (sortOrder) params.append('sortOrder', sortOrder);
+  if (page)      params.append('page', page);
+
+  const res = await fetch(`/api/products/search?${params.toString()}`);
+  const data = await res.json();
+  return data; // data.data = array of products, data.total = total count
+};
+```
+
+> **Note**: `/api/products/search` uses regex matching (supports partial words like `"head"` → matches `"Headphones"`). The existing `GET /api/products?search=` uses MongoDB full-text index and requires complete words.
+
+---
+
+### Get Single Product
+```
+GET /api/products/:id
+```
+**Protected**: No
+
+**Response 200**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "64f...",
+    "name": "Product Name",
+    "description": "Description here",
+    "buyingPrice": 50,
+    "sellingPrice": 80,
+    "stock": 100,
+    "category": "Electronics",
+    "images": ["https://drive.google.com/uc?export=view&id=..."],
+    "rating": 0,
+    "featured": false,
+    "isActive": true,
+    "createdBy": { "_id": "...", "name": "John", "email": "john@example.com" },
+    "profitMargin": 30,
+    "profitMarginPercentage": "60.00",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
 }
 ```
 
 ---
 
-### `POST /api/products`
+### Create Product *(updated — now supports images)*
+```
+POST /api/products
+```
+or
+```
+POST /api/products/create
+```
+**Protected**: Yes
 
-Create a new product.
+**Content-Type**: `application/json`
 
-**Access:** Private
+> **Image upload flow**: Call `POST /api/upload/image` first → get the URL(s) → pass them in the `images` array below.
 
-**Headers:** `Authorization: Bearer <token>`
-
-**Request Body:**
+**Body (JSON)**
 ```json
 {
   "name": "Wireless Headphones",
-  "description": "Premium audio experience",
+  "description": "High-quality noise cancelling headphones",
   "buyingPrice": 50,
   "sellingPrice": 99.99,
-  "stock": 25,
-  "category": "Electronics"
+  "stock": 200,
+  "category": "Electronics",
+  "images": [
+    "https://drive.google.com/uc?export=view&id=1AbC..."
+  ],
+  "featured": false
 }
 ```
 
-| Field | Type | Required | Rules |
-|-------|------|----------|-------|
-| `name` | string | Yes | 2–100 chars, must be unique |
-| `description` | string | Yes | Max 500 chars |
-| `buyingPrice` | number | Yes | >= 0 |
-| `sellingPrice` | number | Yes | >= 0, must be > buyingPrice |
-| `stock` | number | Yes | Integer >= 0 |
-| `category` | string | Yes | One of: `Electronics`, `Clothing`, `Books`, `Home`, `Sports`, `Other` |
-| `images` | string[] | No | Array of image URLs |
+**Field Rules**
 
-**Response `201`:**
+| Field | Required | Rules |
+|-------|----------|-------|
+| `name` | Yes | 2–100 characters, must be unique (case-insensitive) |
+| `description` | Yes | Max 500 characters |
+| `buyingPrice` | Yes | Positive number |
+| `sellingPrice` | Yes | Positive number, must be greater than `buyingPrice` |
+| `stock` | Yes | Non-negative integer |
+| `category` | Yes | One of: `Electronics`, `Clothing`, `Books`, `Home`, `Sports`, `Other` |
+| `images` | No | Array of URL strings (from upload endpoint) |
+| `featured` | No | Boolean (default: false) |
+
+**Response 201**
 ```json
 {
   "success": true,
-  "data": { ... }
+  "data": {
+    "_id": "64f...",
+    "name": "Wireless Headphones",
+    "images": ["https://drive.google.com/uc?export=view&id=1AbC..."],
+    ...
+  }
 }
 ```
 
-> `POST /api/products/create` is an alias for the same endpoint.
+**Error Responses**
+
+| Status | Message | Cause |
+|--------|---------|-------|
+| 400 | Validation errors array | Missing or invalid fields |
+| 400 | Product with name "X" already exists | Duplicate name |
+| 400 | Selling price must be greater than buying price | Price logic error |
+| 401 | Not authorized | Missing or invalid token |
 
 ---
 
-### `PUT /api/products/:id`
+### Update Product
+```
+PUT /api/products/:id
+```
+**Protected**: Yes
 
-Update an existing product.
+**Content-Type**: `application/json`
 
-**Access:** Admin
+**Body**: Same fields as Create (all optional — only send fields you want to update).
 
-**Headers:** `Authorization: Bearer <admin-token>`
+To update images, upload new files first via `POST /api/upload/image` and pass the returned URLs.
 
-**Request Body:** Same fields as create (all optional for update).
-
-**Response `200`:**
+**Response 200**
 ```json
 {
   "success": true,
-  "data": { ... }
+  "data": { ...updated product }
 }
 ```
 
 ---
 
-### `DELETE /api/products/:id`
+### Delete Product
+```
+DELETE /api/products/:id
+```
+**Protected**: Yes
 
-Delete a product permanently.
-
-**Access:** Admin
-
-**Headers:** `Authorization: Bearer <admin-token>`
-
-**Response `200`:**
+**Response 200**
 ```json
 {
   "success": true,
@@ -352,501 +390,303 @@ Delete a product permanently.
 
 ---
 
-## Orders — `/api/orders`
+## Full Create Product Flow (Frontend Guide)
 
-> All order endpoints require authentication.
+This is the recommended step-by-step flow for a "Create Product" form with image upload.
 
-### `POST /api/orders`
+```
+Step 1 — User selects image(s) in the form
+         ↓
+Step 2 — POST /api/upload/image  (multipart/form-data)
+         ← receives: { data: { urls: ["https://drive.google.com/..."] } }
+         ↓
+Step 3 — Store the URL(s) in component state
+         ↓
+Step 4 — User fills in product name, price, etc.
+         ↓
+Step 5 — POST /api/products  (application/json)
+         Body includes: { ..., images: ["https://drive.google.com/..."] }
+         ← receives: { data: { ...full product object } }
+```
 
-Create a new order.
+**React example (create product form)**
+```jsx
+const handleSubmit = async () => {
+  // Step 1: Upload images first
+  let imageUrls = [];
+  if (selectedFiles.length > 0) {
+    const formData = new FormData();
+    selectedFiles.forEach((file) => formData.append('images', file));
 
-**Access:** Private
+    const uploadRes = await fetch('/api/upload/image', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    const uploadData = await uploadRes.json();
+    imageUrls = uploadData.data.urls;
+  }
 
-**Headers:** `Authorization: Bearer <token>`
+  // Step 2: Create product with image URLs
+  const res = await fetch('/api/products', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      description,
+      buyingPrice,
+      sellingPrice,
+      stock,
+      category,
+      images: imageUrls,
+    }),
+  });
+  const data = await res.json();
+};
+```
 
-**Request Body:**
+**HTML input for file picker (supports laptop + phone camera/gallery)**
+```html
+<!-- Laptop file picker -->
+<input type="file" accept="image/jpeg,image/png,image/webp" multiple />
+
+<!-- Mobile: opens camera AND gallery -->
+<input type="file" accept="image/*" multiple />
+
+<!-- Mobile: opens camera only -->
+<input type="file" accept="image/*" capture="environment" />
+```
+
+---
+
+## Orders
+
+### Create Order
+```
+POST /api/orders
+```
+**Protected**: Yes
+
+**Body (JSON)**
 ```json
 {
   "items": [
-    {
-      "product": "64abc123...",
-      "quantity": 2
-    }
+    { "product": "64f...", "quantity": 2 }
   ],
   "shippingAddress": {
     "fullName": "John Doe",
     "address": "123 Main St",
-    "city": "Bangkok",
-    "postalCode": "10110",
-    "country": "Thailand",
-    "phone": "+66812345678"
+    "city": "Phnom Penh",
+    "postalCode": "12000",
+    "country": "Cambodia",
+    "phone": "012345678"
   },
-  "paymentMethod": "credit_card"
+  "paymentMethod": "cash_on_delivery"
 }
 ```
 
-| Field | Type | Required | Rules |
-|-------|------|----------|-------|
-| `items` | array | Yes | Min 1 item |
-| `items[].product` | string | Yes | Valid product ID |
-| `items[].quantity` | number | Yes | Integer >= 1 |
-| `shippingAddress.fullName` | string | Yes | — |
-| `shippingAddress.address` | string | Yes | — |
-| `shippingAddress.city` | string | Yes | — |
-| `shippingAddress.postalCode` | string | Yes | — |
-| `shippingAddress.country` | string | Yes | — |
-| `shippingAddress.phone` | string | No | — |
-| `paymentMethod` | string | Yes | `credit_card`, `paypal`, or `cash_on_delivery` |
+`paymentMethod` options: `credit_card`, `paypal`, `cash_on_delivery`
 
-**Response `201`:**
+**Response 201**
 ```json
 {
   "success": true,
-  "message": "Order created successfully",
-  "data": {
-    "_id": "64def456...",
-    "orderNumber": "ORD-1713432000000-1234",
-    "user": { "name": "John Doe", "email": "john@example.com" },
-    "items": [ ... ],
-    "totalAmount": 199.98,
-    "totalCost": 100,
-    "totalProfit": 99.98,
-    "paymentStatus": "pending",
-    "orderStatus": "pending"
-  }
+  "data": { ...order object }
 }
 ```
 
-> Stock is automatically decremented when an order is created.
+---
+
+### Get My Orders
+```
+GET /api/orders/my-orders
+```
+**Protected**: Yes
 
 ---
 
-### `GET /api/orders/my-orders`
+### Get Order Details
+```
+GET /api/orders/:id
+```
+**Protected**: Yes
 
-Get all orders for the currently logged-in user.
+---
 
-**Access:** Private
+### Process Payment
+```
+POST /api/orders/:id/process
+```
+**Protected**: Yes
 
-**Response `200`:**
+---
+
+### Get My Order Profit Report *(NEW)*
+```
+GET /api/orders/report
+```
+**Protected**: Yes
+
+Returns the logged-in user's orders aggregated by day or month, showing profit, revenue, cost, and order count.
+
+**Query Parameters**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `period` | string | `daily` (default) or `monthly` |
+| `startDate` | string | ISO date `YYYY-MM-DD` (default: 30 days ago) |
+| `endDate` | string | ISO date `YYYY-MM-DD` (default: today) |
+
+**Examples**
+```
+GET /api/orders/report
+GET /api/orders/report?period=daily&startDate=2026-04-01&endDate=2026-04-21
+GET /api/orders/report?period=monthly&startDate=2026-01-01&endDate=2026-04-21
+```
+
+**Response 200**
 ```json
 {
   "success": true,
-  "count": 3,
-  "data": [ ... ]
-}
-```
-
----
-
-### `GET /api/orders/:id`
-
-Get a specific order by ID. Users can only view their own orders; admins can view any.
-
-**Access:** Private
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "data": { ... }
-}
-```
-
----
-
-### `GET /api/orders/:id/success`
-
-Get order success confirmation details (user must own the order).
-
-**Access:** Private
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "message": "Order completed successfully!",
-  "data": {
-    "order": { ... },
-    "successDetails": {
-      "orderNumber": "ORD-1713432000000-1234",
-      "totalAmount": 199.98,
-      "estimatedDelivery": "2026-04-25T10:00:00.000Z",
-      "trackingAvailable": false,
-      "supportEmail": "support@yourstore.com"
-    }
-  }
-}
-```
-
----
-
-### `POST /api/orders/:id/process`
-
-Simulate payment processing for an order.
-
-**Access:** Private (owner or admin)
-
-**Request Body:**
-```json
-{
-  "paymentSuccess": true
-}
-```
-
-**Response `200`** (success) or `400` (failed):
-```json
-{
-  "success": true,
-  "message": "Payment processed successfully",
-  "data": { ... }
-}
-```
-
----
-
-### `GET /api/orders`
-
-Get all orders (admin only).
-
-**Access:** Admin
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "count": 150,
-  "data": [ ... ]
-}
-```
-
----
-
-### `PUT /api/orders/:id/status`
-
-Update the status of an order.
-
-**Access:** Admin
-
-**Request Body:**
-```json
-{
-  "orderStatus": "shipped"
-}
-```
-
-Valid values: `pending`, `processing`, `shipped`, `delivered`, `cancelled`
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "message": "Order status updated successfully",
-  "data": { ... }
-}
-```
-
----
-
-## Analytics — `/api/analytics`
-
-> All analytics endpoints require Admin access.
-
-**Headers:** `Authorization: Bearer <admin-token>`
-
----
-
-### `GET /api/analytics/profit`
-
-Get profit analytics for a specific time period.
-
-**Access:** Admin
-
-**Query Parameters:**
-
-| Param | Values | Default | Description |
-|-------|--------|---------|-------------|
-| `period` | `day`, `week`, `month`, `year` | `day` | Time period to analyze |
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "data": {
-    "period": "month",
-    "dateRange": {
-      "start": "2026-03-18T00:00:00.000Z",
-      "end": "2026-04-18T10:00:00.000Z"
-    },
-    "summary": {
-      "totalRevenue": 15000,
-      "totalCost": 8000,
-      "totalProfit": 7000,
-      "orderCount": 45,
-      "averageOrderValue": 333.33,
-      "profitMargin": "46.67"
-    },
-    "dailyProfit": [
-      {
-        "_id": "2026-04-17",
-        "revenue": 500,
-        "cost": 250,
-        "profit": 250,
-        "orders": 3
-      }
-    ],
-    "topProducts": [
-      {
-        "_id": "64abc123...",
-        "productName": "Wireless Headphones",
-        "totalSold": 20,
-        "totalRevenue": 1999.80,
-        "totalCost": 1000,
-        "totalProfit": 999.80,
-        "profitMargin": "50.00",
-        "productDetails": { ... }
-      }
-    ]
-  }
-}
-```
-
----
-
-### `GET /api/analytics/dashboard`
-
-Get comprehensive dashboard metrics including today's performance, growth vs yesterday, inventory status, and low-stock alerts.
-
-**Access:** Admin
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "data": {
-    "today": {
-      "revenue": 1500,
-      "cost": 800,
-      "profit": 700,
-      "orders": 9,
-      "averageOrderValue": 166.67
-    },
-    "growth": {
-      "revenue": 25.5,
-      "profit": 30.2,
-      "orders": "12.50"
-    },
-    "inventory": {
-      "totalInventoryCost": 50000,
-      "totalInventoryValue": 95000,
-      "totalPotentialProfit": 45000,
-      "productCount": 120
-    },
-    "lowStockProducts": [
-      {
-        "_id": "64abc123...",
-        "name": "USB Cable",
-        "stock": 3,
-        "buyingPrice": 2,
-        "sellingPrice": 9.99
-      }
-    ],
-    "alerts": {
-      "lowStockCount": 8,
-      "outOfStockCount": 2
-    }
-  }
-}
-```
-
----
-
-### `GET /api/analytics/products`
-
-Get product performance analytics showing revenue, cost, profit, and margin per product.
-
-**Access:** Admin
-
-**Query Parameters:**
-
-| Param | Values | Default |
-|-------|--------|---------|
-| `period` | `week`, `month`, `year` | `month` |
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "data": {
-    "period": "month",
-    "productPerformance": [
-      {
-        "_id": "64abc123...",
-        "productName": "Wireless Headphones",
-        "totalSold": 20,
-        "totalRevenue": 1999.80,
-        "totalCost": 1000,
-        "totalProfit": 999.80,
-        "profitMargin": 49.99,
-        "averageSellingPrice": 99.99,
-        "productDetails": { ... }
-      }
-    ]
-  }
-}
-```
-
----
-
-## Users — `/api/users`
-
-> All user management endpoints require Admin access.
-
-**Headers:** `Authorization: Bearer <admin-token>`
-
----
-
-### `GET /api/users`
-
-Get all users with pagination.
-
-**Access:** Admin
-
-**Query Parameters:**
-
-| Param | Default | Description |
-|-------|---------|-------------|
-| `page` | `1` | Page number |
-| `limit` | `10` | Results per page |
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "count": 10,
-  "total": 85,
-  "pagination": { "page": 1, "pages": 9, "limit": 10 },
+  "period": "daily",
+  "startDate": "2026-03-22",
+  "endDate": "2026-04-21",
+  "summary": {
+    "totalProfit": 500.00,
+    "totalRevenue": 1200.00,
+    "totalCost": 700.00,
+    "totalOrders": 12
+  },
   "data": [
     {
-      "_id": "64abc123...",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "user",
-      "isActive": true,
-      "createdAt": "2026-01-10T08:00:00.000Z"
+      "date": "2026-04-01",
+      "profit": 80.00,
+      "revenue": 200.00,
+      "cost": 120.00,
+      "orders": 2
+    },
+    {
+      "date": "2026-04-05",
+      "profit": 150.00,
+      "revenue": 350.00,
+      "cost": 200.00,
+      "orders": 3
     }
   ]
 }
 ```
 
+> `data` only includes dates where at least one order exists. Days/months with no orders are not returned.
+
+**React fetch example**
+```js
+const getOrderReport = async ({ period = 'daily', startDate, endDate, token }) => {
+  const params = new URLSearchParams({ period });
+  if (startDate) params.append('startDate', startDate);
+  if (endDate)   params.append('endDate', endDate);
+
+  const res = await fetch(`/api/orders/report?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  return data;
+  // data.summary  → totals for the full period
+  // data.data     → array of { date, profit, revenue, cost, orders }
+};
+```
+
+**Chart integration example (recharts)**
+```jsx
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+
+// data.data from the API maps directly to recharts format
+<LineChart data={reportData.data}>
+  <CartesianGrid strokeDasharray="3 3" />
+  <XAxis dataKey="date" />
+  <YAxis />
+  <Tooltip />
+  <Line type="monotone" dataKey="profit"  stroke="#10b981" name="Profit" />
+  <Line type="monotone" dataKey="revenue" stroke="#3b82f6" name="Revenue" />
+  <Line type="monotone" dataKey="cost"    stroke="#ef4444" name="Cost" />
+</LineChart>
+```
+
 ---
 
-### `GET /api/users/:id`
+## Users *(Admin only)*
 
-Get a single user by ID.
+### List Users
+```
+GET /api/users
+```
 
-**Access:** Admin
+### Get User
+```
+GET /api/users/:id
+```
 
-**Response `200`:**
+### Update User
+```
+PUT /api/users/:id
+```
+
+### Deactivate User
+```
+DELETE /api/users/:id
+```
+
+---
+
+## Analytics *(Admin only)*
+
+### Dashboard
+```
+GET /api/analytics/dashboard
+```
+
+### Profit by Period
+```
+GET /api/analytics/profit?period=monthly
+```
+`period` options: `daily`, `weekly`, `monthly`, `yearly`
+
+### Product Performance
+```
+GET /api/analytics/products
+```
+
+---
+
+## Common Error Response Shape
+
+All errors follow this structure:
 ```json
 {
-  "success": true,
-  "data": { ... }
+  "success": false,
+  "message": "Error description here"
 }
 ```
 
----
-
-### `PUT /api/users/:id`
-
-Update a user's details.
-
-**Access:** Admin
-
-**Request Body (all fields optional):**
+Validation errors:
 ```json
 {
-  "name": "Jane Doe",
-  "email": "jane@example.com",
-  "role": "admin",
-  "isActive": true
+  "success": false,
+  "errors": [
+    { "field": "name", "message": "Product name is required" }
+  ]
 }
 ```
 
-**Response `200`:**
-```json
-{
-  "success": true,
-  "data": { ... }
-}
-```
-
----
-
-### `DELETE /api/users/:id`
-
-Deactivate a user account (soft delete — sets `isActive: false`).
-
-**Access:** Admin
-
-**Response `200`:**
-```json
-{
-  "success": true,
-  "message": "User deactivated successfully",
-  "data": { ... }
-}
-```
-
----
-
-## Data Models
-
-### User
-```
-_id, name, email, password (hashed), role (user|admin), isActive, createdAt, updatedAt
-```
-
-### Product
-```
-_id, name, description, buyingPrice, sellingPrice, stock, category, images[], rating, featured, isActive, createdBy (User ref), createdAt, updatedAt
-Virtuals: profitMargin, profitMarginPercentage
-```
-
-### Order
-```
-_id, orderNumber, user (User ref), items[], totalAmount, totalCost, totalProfit,
-shippingAddress { fullName, address, city, postalCode, country, phone },
-paymentMethod, paymentStatus (pending|paid|failed|refunded),
-orderStatus (pending|processing|shipped|delivered|cancelled),
-paidAt, deliveredAt, createdAt, updatedAt
-```
-
-#### Order Item
-```
-name, quantity, price, buyingPrice, sellingPrice, product (Product ref)
-```
-
----
-
-## Setup & Running
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Configure environment
-# Edit .env — set your MongoDB Atlas URI (see .env for instructions)
-
-# 3. Start in development mode
-npm run dev
-
-# 4. Start in production mode
-npm start
-```
-
----
-
-## Rate Limiting
-
-- **100 requests per 15 minutes** per IP address
-- Exceeding this returns HTTP `429` with message: `"Too many requests from this IP, please try again later."`
+| HTTP Status | Meaning |
+|-------------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad request / validation error |
+| 401 | Unauthorized (missing or invalid token) |
+| 403 | Forbidden (insufficient role) |
+| 404 | Resource not found |
+| 429 | Too many requests (rate limit: 100 req / 15 min) |
+| 500 | Server error |

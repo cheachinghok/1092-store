@@ -52,8 +52,12 @@ export default function POSScreen() {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (category !== 'All') params.set('category', category);
+    params.set('inStock', 'true');
+    params.set('limit', '100');
+    params.set('sortBy', 'name');
+    params.set('sortOrder', 'asc');
     try {
-      const res = await fetch(`${API_BASE}/api/products?${params}`);
+      const res = await fetch(`${API_BASE}/api/products/search?${params}`);
       const data = await res.json();
       if (data.success) {
         const mapped = data.data.map((p: any) => ({

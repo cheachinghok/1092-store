@@ -5,4 +5,4 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const API_BASE = 'https://modern-node-app.onrender.com';
+export const API_BASE = import.meta.env.VITE_API_BASE ?? '';

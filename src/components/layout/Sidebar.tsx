@@ -9,6 +9,7 @@ import {
   Cog6ToothIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  TagIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'POS', icon: ShoppingBagIcon, exact: true },
   { to: '/dashboard', label: 'Dashboard', icon: ChartBarIcon },
   { to: '/products', label: 'Products', icon: CubeIcon },
+  { to: '/categories', label: 'Categories', icon: TagIcon },
   { to: '/inventory', label: 'Inventory', icon: ClipboardDocumentListIcon },
   { to: '/reports', label: 'Reports', icon: DocumentChartBarIcon },
   { to: '/settings', label: 'Settings', icon: Cog6ToothIcon },

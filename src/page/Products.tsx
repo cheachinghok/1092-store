@@ -1,21 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { MagnifyingGlassIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
+import React, { useState, useEffect, useRef } from 'react';
+import { MagnifyingGlassIcon, XMarkIcon, PlusIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { API_BASE } from '../lib/utils';
+
+interface Category {
+  _id: string;
+  name: string;
+}
 
 interface Product {
   _id: string;
   name: string;
-  category: string;
+  category: Category | string;
   sellingPrice: number;
   buyingPrice?: number;
   stock: number;
   description: string;
   barcode?: string;
+  images?: string[];
 }
 
-const CATEGORIES = ['Cleaning', 'Bags', 'Cups', 'Paper', 'Containers', 'Home', 'Other'];
-
-const emptyForm = { name: '', category: 'Other', sellingPrice: '', buyingPrice: '', stock: '', description: '', barcode: '' };
+const emptyForm = { name: '', category: '', sellingPrice: '', buyingPrice: '', stock: '', description: '', barcode: '' };
 
 function Toast({ message, type, onDone }: { message: string; type: 'success' | 'error'; onDone: () => void }) {
   useEffect(() => { const t = setTimeout(onDone, 2500); return () => clearTimeout(t); }, [onDone]);
@@ -37,6 +41,17 @@ export default function Products() {
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/categories`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setCategories(d.data); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(fetchProducts, 1000);
@@ -52,21 +67,41 @@ export default function Products() {
       params.set('limit', '100');
       params.set('sortBy', 'name');
       params.set('sortOrder', 'asc');
-      const res = await fetch(`${API_BASE}/api/products/search?${params}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/api/products/search?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const d = await res.json();
       if (d.success) setProducts(d.data);
     } catch {} finally { setLoading(false); }
   };
 
-  const openAdd = () => { setEditTarget(null); setForm(emptyForm); setSlideOpen(true); };
+  const openAdd = () => {
+    setEditTarget(null); setForm(emptyForm);
+    setImageFile(null); setImagePreview('');
+    setSlideOpen(true);
+  };
+  const getCategoryName = (cat: Category | string) =>
+    typeof cat === 'object' ? cat.name : cat;
+
   const openEdit = (p: Product) => {
     setEditTarget(p);
+    const catId = typeof p.category === 'object' ? p.category._id : p.category;
     setForm({
-      name: p.name, category: p.category,
+      name: p.name, category: catId,
       sellingPrice: String(p.sellingPrice), buyingPrice: String(p.buyingPrice ?? ''),
       stock: String(p.stock), description: p.description, barcode: p.barcode || '',
     });
+    setImageFile(null);
+    setImagePreview(p.images?.[0] || '');
     setSlideOpen(true);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
   const handleSubmit = async () => {
@@ -76,15 +111,31 @@ export default function Products() {
     try {
       const method = editTarget ? 'PUT' : 'POST';
       const url = editTarget ? `${API_BASE}/api/products/${editTarget._id}` : `${API_BASE}/api/products`;
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          name: form.name, category: form.category,
-          sellingPrice: Number(form.sellingPrice), buyingPrice: Number(form.buyingPrice),
-          stock: Number(form.stock), barcode: form.barcode, description: form.description,
-        }),
-      });
+
+      let res: Response;
+      if (imageFile) {
+        const fd = new FormData();
+        fd.append('name', form.name);
+        fd.append('category', form.category);
+        fd.append('sellingPrice', form.sellingPrice);
+        fd.append('buyingPrice', form.buyingPrice);
+        fd.append('stock', form.stock);
+        fd.append('barcode', form.barcode);
+        fd.append('description', form.description);
+        fd.append('image', imageFile);
+        res = await fetch(url, { method, headers: { Authorization: `Bearer ${token}` }, body: fd });
+      } else {
+        res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            name: form.name, category: form.category,
+            sellingPrice: Number(form.sellingPrice), buyingPrice: Number(form.buyingPrice),
+            stock: Number(form.stock), barcode: form.barcode, description: form.description,
+          }),
+        });
+      }
+
       const d = await res.json();
       if (d.success) {
         setToast({ message: editTarget ? 'Product updated' : 'Product added', type: 'success' });
@@ -137,7 +188,7 @@ export default function Products() {
         <select value={filter} onChange={e => setFilter(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
           <option value="">All Categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
         </select>
       </div>
 
@@ -155,7 +206,7 @@ export default function Products() {
                 <div key={p._id} className="p-4 flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-800 text-sm truncate">{p.name}</p>
-                    <span className="inline-block mt-0.5 bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{p.category}</span>
+                    <span className="inline-block mt-0.5 bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{getCategoryName(p.category)}</span>
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-gray-500">
                       <span>${p.sellingPrice?.toFixed(2)}</span>
                       <span className={p.stock === 0 ? 'text-red-600 font-semibold' : p.stock <= 10 ? 'text-amber-600 font-semibold' : ''}>
@@ -190,7 +241,7 @@ export default function Products() {
                     <tr key={p._id} className="hover:bg-gray-50">
                       <td className="px-5 py-3 font-medium text-gray-800">{p.name}</td>
                       <td className="px-5 py-3">
-                        <span className="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{p.category}</span>
+                        <span className="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{getCategoryName(p.category)}</span>
                       </td>
                       <td className="px-5 py-3 text-gray-700">${p.sellingPrice?.toFixed(2)}</td>
                       <td className="px-5 py-3">
@@ -224,6 +275,33 @@ export default function Products() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Image upload */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Product Image</label>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                {imagePreview ? (
+                  <div className="relative rounded-lg overflow-hidden border border-gray-200">
+                    <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover" />
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 hover:opacity-100 bg-black/30 transition-opacity">
+                      <button type="button" onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50">
+                        Change
+                      </button>
+                      <button type="button" onClick={() => { setImageFile(null); setImagePreview(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="px-3 py-1.5 bg-white text-red-600 rounded-lg text-xs font-medium hover:bg-red-50">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => fileInputRef.current?.click()}
+                    className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-indigo-400 hover:text-indigo-500 transition-colors">
+                    <PhotoIcon className="w-8 h-8" />
+                    <span className="text-xs">Click to upload image</span>
+                  </button>
+                )}
+              </div>
+
               {[
                 { label: 'Product Name', key: 'name', type: 'text', placeholder: 'e.g. Garbage Bag 30L' },
                 { label: 'Buying Price ($)', key: 'buyingPrice', type: 'number', placeholder: '0.00' },
@@ -243,7 +321,8 @@ export default function Products() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
                 <select value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="">Select category</option>
+                  {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                 </select>
               </div>
             </div>

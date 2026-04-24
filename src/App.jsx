@@ -8,6 +8,7 @@ import Products from './page/Products';
 import Inventory from './page/Inventory';
 import Reports from './page/Reports';
 import Settings from './page/Settings';
+import Categories from './page/Categories';
 
 const NotFound = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -34,6 +35,7 @@ const App = () => (
       <Route path="/products" element={<Protected><Products /></Protected>} />
       <Route path="/inventory" element={<Protected><Inventory /></Protected>} />
       <Route path="/reports" element={<Protected><Reports /></Protected>} />
+      <Route path="/categories" element={<Protected><Categories /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
       <Route path="*" element={<NotFound />} />
     </Routes>

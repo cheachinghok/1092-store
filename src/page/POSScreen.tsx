@@ -32,7 +32,7 @@ export default function POSScreen() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
-  const [categories, setCategories] = useState<string[]>(['All']);
+  const [categoryList, setCategoryList] = useState<{ _id: string; name: string }[]>([]);
   const [cashInput, setCashInput] = useState('');
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingPriceVal, setEditingPriceVal] = useState('');
@@ -42,6 +42,13 @@ export default function POSScreen() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { searchRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/categories`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setCategoryList(d.data); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(fetchProducts, 300);
@@ -58,16 +65,18 @@ export default function POSScreen() {
     params.set('sortBy', 'name');
     params.set('sortOrder', 'asc');
     try {
-      const res = await fetch(`${API_BASE}/api/products/search?${params}`);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/api/products/search?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
       if (data.success) {
         const mapped = data.data.map((p: any) => ({
           id: p._id, _id: p._id, name: p.name, price: p.sellingPrice,
-          category: p.category, image: p.images?.[0] || '', description: p.description, stock: p.stock ?? 0,
+          category: typeof p.category === 'object' ? p.category?.name : p.category,
+          image: p.images?.[0] || '', description: p.description, stock: p.stock ?? 0,
         }));
         setProducts(mapped);
-        const cats = ['All', ...Array.from(new Set(mapped.map((p: Product) => p.category))) as string[]];
-        setCategories(cats);
       }
     } catch {}
     finally { setLoading(false); }
@@ -262,15 +271,23 @@ export default function POSScreen() {
 
         {/* Category tiles */}
         <div className="flex gap-2 overflow-x-auto pb-1 shrink-0">
-          {categories.map(cat => (
+          <button
+            onClick={() => setCategory('All')}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              category === 'All' ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            All
+          </button>
+          {categoryList.map(cat => (
             <button
-              key={cat}
-              onClick={() => setCategory(cat)}
+              key={cat._id}
+              onClick={() => setCategory(cat._id)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                category === cat ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                category === cat._id ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
               }`}
             >
-              {cat}
+              {cat.name}
             </button>
           ))}
         </div>

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MagnifyingGlassIcon, XMarkIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useCart } from '../context/CartContext';
-import { API_BASE } from '../lib/utils';
+import { API_BASE, fmtUSD, fmtKHR } from '../lib/utils';
 
 interface Product {
   id: string;
   _id: string;
   name: string;
   price: number;
+  priceKHR: number;
   category: string;
   image: string;
   description: string;
@@ -72,7 +73,8 @@ export default function POSScreen() {
       const data = await res.json();
       if (data.success) {
         const mapped = data.data.map((p: any) => ({
-          id: p._id, _id: p._id, name: p.name, price: p.sellingPrice,
+          id: p._id, _id: p._id, name: p.name, price: p.sellingPrice ?? 0,
+          priceKHR: p.sellingPriceKHR ?? 0,
           category: typeof p.category === 'object' ? p.category?.name : p.category,
           image: p.images?.[0] || '', description: p.description, stock: p.stock ?? 0,
         }));
@@ -84,6 +86,7 @@ export default function POSScreen() {
 
   const cash = parseFloat(cashInput) || 0;
   const change = cash - total;
+  const khrRate = Number(localStorage.getItem('usdToKhr')) || 4100;
 
   const handleCharge = async () => {
     if (items.length === 0 || cash < total) return;
@@ -107,7 +110,7 @@ export default function POSScreen() {
       });
       const data = await res.json();
       if (data.success) {
-        setToast({ message: `Charged $${total.toFixed(2)} — Change $${change.toFixed(2)}`, type: 'success' });
+        setToast({ message: `Charged ${fmtUSD(total)} — Change ${fmtUSD(change)} / ${fmtKHR(change * khrRate)}`, type: 'success' });
         clearCart();
         setCashInput('');
         setCartOpen(false);
@@ -170,14 +173,14 @@ export default function POSScreen() {
                   <button
                     onClick={() => startEditPrice(item.id, effectivePrice)}
                     className={`flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-medium transition-colors ${priceEdited ? 'text-amber-600 bg-amber-50' : 'text-gray-700 hover:bg-gray-100'}`}
-                    title={priceEdited ? `Original: $${item.price.toFixed(2)}` : 'Edit price'}
+                    title={priceEdited ? `Original: ${fmtUSD(item.price)}` : 'Edit price'}
                   >
-                    ${effectivePrice.toFixed(2)}
+                    {fmtUSD(effectivePrice)}
                     <PencilIcon className="w-3 h-3" />
                   </button>
                 )}
                 <span className="ml-auto text-sm font-semibold text-gray-900">
-                  ${(effectivePrice * item.quantity).toFixed(2)}
+                  {fmtUSD(effectivePrice * item.quantity)}
                 </span>
               </div>
             </div>
@@ -189,7 +192,10 @@ export default function POSScreen() {
       <div className="border-t border-gray-200 px-4 py-3">
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-600 font-medium">TOTAL</span>
-          <span className="text-xl font-bold text-gray-900">${total.toFixed(2)}</span>
+          <div className="text-right">
+            <div className="text-xl font-bold text-gray-900">{fmtUSD(total)}</div>
+            <div className="text-xs text-gray-400">{fmtKHR(total * khrRate)}</div>
+          </div>
         </div>
       </div>
 
@@ -232,7 +238,7 @@ export default function POSScreen() {
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-600">Change:</span>
           <span className={`text-base font-bold ${change >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-            {cashInput === '' ? '—' : change >= 0 ? `$${change.toFixed(2)}` : 'Need more'}
+            {cashInput === '' ? '—' : change >= 0 ? `${fmtUSD(change)} / ${fmtKHR(change * khrRate)}` : 'Need more'}
           </span>
         </div>
       </div>
@@ -244,7 +250,15 @@ export default function POSScreen() {
           disabled={items.length === 0 || cash < total || charging}
           className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold text-base rounded-xl transition-colors"
         >
-          {charging ? 'Processing…' : `CHARGE  $${total.toFixed(2)}`}
+          {charging ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              Processing…
+            </span>
+          ) : `CHARGE  ${fmtUSD(total)} / ${fmtKHR(total * khrRate)}`}
         </button>
       </div>
     </>
@@ -312,7 +326,8 @@ export default function POSScreen() {
                 )}
                 <div className="p-2">
                   <p className="text-xs font-semibold text-gray-800 line-clamp-2 leading-tight">{p.name}</p>
-                  <p className="text-sm font-bold text-indigo-700 mt-1">${p.price.toFixed(2)}</p>
+                  <p className="text-sm font-bold text-indigo-700 mt-1">{fmtUSD(p.price)}</p>
+                  {p.priceKHR > 0 && <p className="text-xs text-gray-400">{fmtKHR(p.priceKHR)}</p>}
                   {p.stock <= 10 && p.stock > 0 && (
                     <p className="text-xs text-amber-600 mt-0.5">Only {p.stock} left</p>
                   )}
@@ -345,7 +360,7 @@ export default function POSScreen() {
         >
           <span className="bg-emerald-700 rounded-lg px-2.5 py-1 text-sm font-bold">{itemCount}</span>
           <span className="font-bold text-base">View Cart</span>
-          <span className="font-bold text-base">${total.toFixed(2)}</span>
+          <span className="font-bold text-base">{fmtUSD(total)}</span>
         </button>
       </div>
 

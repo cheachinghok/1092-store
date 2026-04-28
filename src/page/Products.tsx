@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MagnifyingGlassIcon, XMarkIcon, PlusIcon, PhotoIcon } from '@heroicons/react/24/outline';
-import { API_BASE } from '../lib/utils';
+import { API_BASE, fmtUSD, fmtKHR } from '../lib/utils';
 
 interface Category {
   _id: string;
@@ -13,6 +13,8 @@ interface Product {
   category: Category | string;
   sellingPrice: number;
   buyingPrice?: number;
+  sellingPriceKHR?: number;
+  buyingPriceKHR?: number;
   stock: number;
   description: string;
   barcode?: string;
@@ -20,6 +22,7 @@ interface Product {
 }
 
 const emptyForm = { name: '', category: '', sellingPrice: '', buyingPrice: '', stock: '', description: '', barcode: '' };
+type PriceCurrency = 'USD' | 'KHR';
 
 function Toast({ message, type, onDone }: { message: string; type: 'success' | 'error'; onDone: () => void }) {
   useEffect(() => { const t = setTimeout(onDone, 2500); return () => clearTimeout(t); }, [onDone]);
@@ -44,6 +47,7 @@ export default function Products() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [categories, setCategories] = useState<Category[]>([]);
+  const [priceCurrency, setPriceCurrency] = useState<PriceCurrency>('USD');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,6 +83,7 @@ export default function Products() {
   const openAdd = () => {
     setEditTarget(null); setForm(emptyForm);
     setImageFile(null); setImagePreview('');
+    setPriceCurrency('USD');
     setSlideOpen(true);
   };
   const getCategoryName = (cat: Category | string) =>
@@ -87,9 +92,12 @@ export default function Products() {
   const openEdit = (p: Product) => {
     setEditTarget(p);
     const catId = typeof p.category === 'object' ? p.category._id : p.category;
+    const hasKHR = !p.sellingPrice && !!p.sellingPriceKHR;
+    setPriceCurrency(hasKHR ? 'KHR' : 'USD');
     setForm({
       name: p.name, category: catId,
-      sellingPrice: String(p.sellingPrice), buyingPrice: String(p.buyingPrice ?? ''),
+      sellingPrice: hasKHR ? String(p.sellingPriceKHR ?? '') : String(p.sellingPrice),
+      buyingPrice: hasKHR ? String(p.buyingPriceKHR ?? '') : String(p.buyingPrice ?? ''),
       stock: String(p.stock), description: p.description, barcode: p.barcode || '',
     });
     setImageFile(null);
@@ -127,14 +135,17 @@ export default function Products() {
         ? `${API_BASE}/api/products/${editTarget._id}`
         : `${API_BASE}/api/products/create`;
 
+      const priceFields = priceCurrency === 'KHR'
+        ? { buyingPriceKHR: Number(form.buyingPrice), sellingPriceKHR: Number(form.sellingPrice) }
+        : { buyingPrice: Number(form.buyingPrice), sellingPrice: Number(form.sellingPrice) };
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           name: form.name,
           description: form.description,
-          buyingPrice: Number(form.buyingPrice),
-          sellingPrice: Number(form.sellingPrice),
+          ...priceFields,
           stock: Number(form.stock),
           category: form.category,
         }),
@@ -213,7 +224,7 @@ export default function Products() {
                     <p className="font-medium text-gray-800 text-sm truncate">{p.name}</p>
                     <span className="inline-block mt-0.5 bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{getCategoryName(p.category)}</span>
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-gray-500">
-                      <span>${p.sellingPrice?.toFixed(2)}</span>
+                      <span>{fmtUSD(p.sellingPrice ?? 0)}{p.sellingPriceKHR ? ` / ${fmtKHR(p.sellingPriceKHR)}` : ''}</span>
                       <span className={p.stock === 0 ? 'text-red-600 font-semibold' : p.stock <= 10 ? 'text-amber-600 font-semibold' : ''}>
                         Stock: {p.stock}
                       </span>
@@ -248,7 +259,10 @@ export default function Products() {
                       <td className="px-5 py-3">
                         <span className="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{getCategoryName(p.category)}</span>
                       </td>
-                      <td className="px-5 py-3 text-gray-700">${p.sellingPrice?.toFixed(2)}</td>
+                      <td className="px-5 py-3 text-gray-700">
+                        <div>{fmtUSD(p.sellingPrice ?? 0)}</div>
+                        {p.sellingPriceKHR ? <div className="text-xs text-gray-400">{fmtKHR(p.sellingPriceKHR)}</div> : null}
+                      </td>
                       <td className="px-5 py-3">
                         <span className={`text-xs font-semibold ${p.stock === 0 ? 'text-red-600' : p.stock <= 10 ? 'text-amber-600' : 'text-gray-700'}`}>{p.stock}</span>
                       </td>
@@ -307,21 +321,72 @@ export default function Products() {
                 )}
               </div>
 
-              {[
-                { label: 'Product Name', key: 'name', type: 'text', placeholder: 'e.g. Garbage Bag 30L' },
-                { label: 'Buying Price ($)', key: 'buyingPrice', type: 'number', placeholder: '0.00' },
-                { label: 'Selling Price ($)', key: 'sellingPrice', type: 'number', placeholder: '0.00' },
-                { label: 'Stock Quantity', key: 'stock', type: 'number', placeholder: '0' },
-                { label: 'Barcode', key: 'barcode', type: 'text', placeholder: 'Optional' },
-                { label: 'Description', key: 'description', type: 'text', placeholder: 'e.g. 30L black garbage bags, pack of 10' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">{f.label}</label>
-                  <input type={f.type} placeholder={f.placeholder} value={(form as any)[f.key]}
-                    onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Product Name</label>
+                <input type="text" placeholder="e.g. Garbage Bag 30L" value={form.name}
+                  onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+
+              {/* Currency toggle + prices */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-gray-700">Price Currency</span>
+                  <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs font-semibold">
+                    <button type="button" onClick={() => setPriceCurrency('USD')}
+                      className={`px-3 py-1 transition-colors ${priceCurrency === 'USD' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                      USD
+                    </button>
+                    <button type="button" onClick={() => setPriceCurrency('KHR')}
+                      className={`px-3 py-1 transition-colors ${priceCurrency === 'KHR' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                      KHR
+                    </button>
+                  </div>
                 </div>
-              ))}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Buying Price ({priceCurrency === 'KHR' ? '៛' : '$'})
+                    </label>
+                    <input type="number" placeholder="0" value={form.buyingPrice}
+                      onChange={e => setForm(prev => ({ ...prev, buyingPrice: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Selling Price ({priceCurrency === 'KHR' ? '៛' : '$'})
+                    </label>
+                    <input type="number" placeholder="0" value={form.sellingPrice}
+                      onChange={e => setForm(prev => ({ ...prev, sellingPrice: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Stock Quantity</label>
+                <input type="number" placeholder="0" value={form.stock}
+                  onChange={e => setForm(prev => ({ ...prev, stock: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+
+              {/* Barcode */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Barcode</label>
+                <input type="text" placeholder="Optional" value={form.barcode}
+                  onChange={e => setForm(prev => ({ ...prev, barcode: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                <input type="text" placeholder="e.g. 30L black garbage bags, pack of 10" value={form.description}
+                  onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
                 <select value={form.category} onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}

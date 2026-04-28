@@ -107,34 +107,38 @@ export default function Products() {
   const handleSubmit = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
+
+    const missing: string[] = [];
+    if (!form.name.trim()) missing.push('Product name');
+    if (!form.description.trim()) missing.push('Description');
+    if (!form.buyingPrice || Number(form.buyingPrice) <= 0) missing.push('Buying price');
+    if (!form.sellingPrice || Number(form.sellingPrice) <= 0) missing.push('Selling price');
+    if (form.stock === '' || Number(form.stock) < 0) missing.push('Stock');
+    if (!form.category) missing.push('Category');
+    if (missing.length > 0) {
+      setToast({ message: `Required: ${missing.join(', ')}`, type: 'error' });
+      return;
+    }
+
     setSaving(true);
     try {
       const method = editTarget ? 'PUT' : 'POST';
-      const url = editTarget ? `${API_BASE}/api/products/${editTarget._id}` : `${API_BASE}/api/products`;
+      const url = editTarget
+        ? `${API_BASE}/api/products/${editTarget._id}`
+        : `${API_BASE}/api/products/create`;
 
-      let res: Response;
-      if (imageFile) {
-        const fd = new FormData();
-        fd.append('name', form.name);
-        fd.append('category', form.category);
-        fd.append('sellingPrice', form.sellingPrice);
-        fd.append('buyingPrice', form.buyingPrice);
-        fd.append('stock', form.stock);
-        fd.append('barcode', form.barcode);
-        fd.append('description', form.description);
-        fd.append('image', imageFile);
-        res = await fetch(url, { method, headers: { Authorization: `Bearer ${token}` }, body: fd });
-      } else {
-        res = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            name: form.name, category: form.category,
-            sellingPrice: Number(form.sellingPrice), buyingPrice: Number(form.buyingPrice),
-            stock: Number(form.stock), barcode: form.barcode, description: form.description,
-          }),
-        });
-      }
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: form.name,
+          description: form.description,
+          buyingPrice: Number(form.buyingPrice),
+          sellingPrice: Number(form.sellingPrice),
+          stock: Number(form.stock),
+          category: form.category,
+        }),
+      });
 
       const d = await res.json();
       if (d.success) {
@@ -142,7 +146,8 @@ export default function Products() {
         setSlideOpen(false);
         fetchProducts();
       } else {
-        setToast({ message: d.message || 'Save failed', type: 'error' });
+        const msg = d.errors?.map((e: any) => e.msg).join(', ') || d.message || 'Save failed';
+        setToast({ message: msg, type: 'error' });
       }
     } catch { setToast({ message: 'Network error', type: 'error' }); }
     finally { setSaving(false); }
@@ -308,7 +313,7 @@ export default function Products() {
                 { label: 'Selling Price ($)', key: 'sellingPrice', type: 'number', placeholder: '0.00' },
                 { label: 'Stock Quantity', key: 'stock', type: 'number', placeholder: '0' },
                 { label: 'Barcode', key: 'barcode', type: 'text', placeholder: 'Optional' },
-                { label: 'Description', key: 'description', type: 'text', placeholder: 'Optional' },
+                { label: 'Description', key: 'description', type: 'text', placeholder: 'e.g. 30L black garbage bags, pack of 10' },
               ].map(f => (
                 <div key={f.key}>
                   <label className="block text-xs font-medium text-gray-700 mb-1">{f.label}</label>

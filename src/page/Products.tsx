@@ -112,6 +112,22 @@ export default function Products() {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  const uploadImage = async (file: File, token: string): Promise<string[]> => {
+    const fd = new FormData();
+    fd.append('images', file);
+    const res = await fetch(`${API_BASE}/api/upload/image`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    });
+    const d = await res.json();
+    const urls = d?.data?.urls;
+    if (!d.success || !Array.isArray(urls) || urls.length === 0) {
+      throw new Error(d.message || 'Image upload failed');
+    }
+    return urls as string[];
+  };
+
   const handleSubmit = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -130,6 +146,19 @@ export default function Products() {
 
     setSaving(true);
     try {
+      let images: string[] | undefined;
+      if (imageFile) {
+        try {
+          images = await uploadImage(imageFile, token);
+        } catch (e: any) {
+          setToast({ message: e.message || 'Image upload failed', type: 'error' });
+          setSaving(false);
+          return;
+        }
+      } else if (editTarget?.images?.length) {
+        images = editTarget.images;
+      }
+
       const method = editTarget ? 'PUT' : 'POST';
       const url = editTarget
         ? `${API_BASE}/api/products/${editTarget._id}`
@@ -148,6 +177,7 @@ export default function Products() {
           ...priceFields,
           stock: Number(form.stock),
           category: form.category,
+          ...(images ? { images } : {}),
         }),
       });
 
